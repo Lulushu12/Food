@@ -1,0 +1,123 @@
+name: Build APK
+
+# The Pages deploy in deploy.yml is the web app; this produces the
+# sideloadable APK.
+on:
+  # An app change rebuilds the APK, so the download link stays current
+  # without anyone opening the Actions tab (the GitHub mobile app has none).
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "public/**"
+      - "android/**"
+      - "package*.json"
+      - "vite.config.js"
+      - "index.html"
+      - ".github/workflows/android-apk.yml"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Attach the APK to its Release (gives a phone-friendly download link)"
+        type: boolean
+        default: true
+
+# Needed to create/update the Releases the APKs are attached to.
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      # `secrets` is not a valid context in a step-level `if`, so the presence
+      # check is hoisted into job env, which may read secrets.
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      TAG: food-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # ubuntu-latest ships the Android SDK; only the JDK needs pinning.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: npm ci
+
+      # Builds with `--mode android` (relative asset paths, no service worker)
+      # and copies dist/ into the native project.
+      - run: npm run build:android
+
+      # A release build is not debuggable, so no ADB debugger can attach to it
+      # on a normal device. It needs a keystore; without one we fall back to a
+      # debug APK, which is installable but debuggable — fine for trying out,
+      # worth replacing for something you keep on your phone.
+      - name: Decode keystore
+        if: env.HAS_KEYSTORE == 'true'
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      - name: Assemble release APK (signed)
+        if: env.HAS_KEYSTORE == 'true'
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          ANDROID_KEYSTORE_ALIAS_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_ALIAS_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Assemble debug APK (no keystore configured)
+        if: env.HAS_KEYSTORE != 'true'
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"
+
+      # Fixed name so each Release download URL stays stable across builds.
+      - name: Collect APK
+        run: |
+          src=$(ls android/app/build/outputs/apk/release/*.apk 2>/dev/null | head -1)
+          [ -n "$src" ] || src=$(ls android/app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1)
+          [ -n "$src" ] || { echo "no APK produced"; exit 1; }
+          mkdir -p out && cp "$src" "out/food.apk"
+          echo "Built from: $src"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: food-apk
+          path: out/food.apk
+          if-no-files-found: error
+
+      # Release assets download straight from a phone — no login, no zip,
+      # unlike Actions artifacts. Uses the preinstalled gh CLI, not a
+      # third-party action.
+      #
+      # The release is recreated each run (--cleanup-tag) so its tag always
+      # points at the commit the APK was built from; uploading to a pre-existing
+      # tag would leave the release pinned to whatever that tag happened to be.
+      - name: Publish to Release
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" "out/food.apk" \
+            --target "$GITHUB_SHA" \
+            --title "food APK" \
+            --notes "Offline Android build of the food app.
+
+          Install: tap the \`food.apk\` asset below, then allow your browser to install unknown apps when prompted."
+          echo "### food" >> "$GITHUB_STEP_SUMMARY"
+          echo "https://github.com/${{ github.repository }}/releases/download/$TAG/food.apk" >> "$GITHUB_STEP_SUMMARY"

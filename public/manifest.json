@@ -1,0 +1,64 @@
+{
+  "id": "/food/",
+  "name": "Food",
+  "short_name": "Food",
+  "description": "Recipes and macro log. Offline, auto-saving.",
+  "start_url": "/food/",
+  "scope": "/food/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "icons": [
+    {
+      "src": "/food/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/food/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/food/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/food/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Log food",
+      "short_name": "Log food",
+      "url": "/food/?action=log",
+      "icons": [
+        {
+          "src": "/food/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Log weight",
+      "short_name": "Weight",
+      "url": "/food/?action=weight",
+      "icons": [
+        {
+          "src": "/food/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}

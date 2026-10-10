@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Capacitor's template shared the whole of external storage and the cache dir
+  through the FileProvider. No plugin is installed, so nothing ever asks for a
+  content:// URI — the grants were unused surface. Left empty rather than
+  removing the provider, so adding a plugin later means declaring exactly the
+  path it needs.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android" />
