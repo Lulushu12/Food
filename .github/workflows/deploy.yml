@@ -23,7 +23,7 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-      # Served at https://<owner>.github.io/food/ once Pages is set to the
+      # Served at https://<owner>.github.io/Food/ once Pages is set to the
       # gh-pages branch (Settings > Pages, one time).
       - uses: peaceiris/actions-gh-pages@v4
         with:
